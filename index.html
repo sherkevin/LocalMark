@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="./assets/vditor/dist/index.css" />
+  <script src="./assets/vditor/dist/index.min.js"></script>
+  <link href="./assets/fontawesome/css/all.min.css" rel="stylesheet">
+  
+  <style>
+    /* --- 基础样式 --- */
+    :root {
+      --bg-sidebar: #202020; --bg-editor: #1e1e1e; --border-color: #333;
+      --accent-color: #7b59de; --text-main: #d4d4d4; --text-muted: #787878;
+      --item-hover: #2a2a2a; --item-active: #323232; --danger-color: #e06c75;
+    }
+    body { margin: 0; padding: 0; font-family: sans-serif; background: var(--bg-editor); color: var(--text-main); height: 100vh; display: flex; overflow: hidden; font-size: 13px; user-select: none; }
+    
+    /* 左侧边栏 */
+    #sidebar { 
+      width: 240px; min-width: 150px; background: var(--bg-sidebar); 
+      display: flex; flex-direction: column; position: relative; border-right: 1px solid var(--border-color); z-index: 20; 
+    }
+    #resizer { position: absolute; right: -3px; top: 0; width: 6px; height: 100%; cursor: col-resize; z-index: 100; }
+    
+    /* 现代化搜索栏 */
+    .search-wrapper { 
+      padding: 12px; 
+      border-bottom: 1px solid var(--border-color);
+      background: var(--bg-sidebar);
+    }
+    
+    .search-container {
+      position: relative;
+      display: flex;
+      align-items: center;
+      background: #1a1a1a;
+      border: 1px solid #3a3a3a;
+      border-radius: 6px;
+      transition: all 0.2s;
+    }
+    
+    .search-container:focus-within {
+      border-color: var(--accent-color);
+      box-shadow: 0 0 0 2px rgba(123, 89, 222, 0.2);
+    }
+    
+    #search-input { 
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: #fff; 
+      padding: 8px 12px;
+      font-size: 13px;
+      outline: none;
+    }
+    
+    #search-input::placeholder {
+      color: #666;
+    }
+    
+    .search-actions {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 0 8px;
+      border-left: 1px solid #3a3a3a;
+    }
+    
+    .search-btn {
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      border-radius: 4px;
+      color: #888;
+      transition: all 0.2s;
+      font-size: 12px;
+    }
+    
+    .search-btn:hover {
+      background: #2a2a2a;
+      color: #fff;
+    }
+    
+    .search-btn.active {
+      background: var(--accent-color);
+      color: #fff;
+    }
+    
+    .search-btn[title]:hover::after {
+      content: attr(title);
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1a1a1a;
+      color: #fff;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      white-space: nowrap;
+      margin-bottom: 4px;
+      border: 1px solid #3a3a3a;
+      z-index: 1000;
+    }
+    
+    .search-options {
+      display: flex;
+      gap: 2px;
+      margin-top: 8px;
+      padding: 0 4px;
+    }
+    
+    .search-option-btn {
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 500;
+      background: transparent;
+      border: 1px solid #3a3a3a;
+      border-radius: 4px;
+      color: #888;
+      cursor: pointer;
+      transition: all 0.2s;
+      min-width: 32px;
+      text-align: center;
+    }
+    
+    .search-option-btn:hover {
+      background: #2a2a2a;
+      border-color: #4a4a4a;
+      color: #fff;
+    }
+    
+    .search-option-btn.active {
+      background: var(--accent-color);
+      border-color: var(--accent-color);
+      color: #fff;
+    }
+    
+    .search-option-btn.active:hover {
+      background: #8b6de0;
+      border-color: #8b6de0;
+    }
+    
+    .sidebar-header { padding: 8px 16px; display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); align-items: center; }
+    .header-title { font-weight: bold; color: var(--text-muted); font-size: 11px; }
+
+    #file-list { flex: 1; overflow-y: overlay; padding: 5px 0; }
+    #file-list::-webkit-scrollbar { width: 4px; }
+    #file-list::-webkit-scrollbar-thumb { background: #444; }
+
+    .file-item { padding: 6px 16px; cursor: pointer; display: flex; align-items: center; color: var(--text-muted); border-left: 3px solid transparent; user-select: none; }
+    .file-item:hover { background: var(--item-hover); color: var(--text-main); }
+    .file-item.active { background: var(--item-active); color: var(--text-main); border-left-color: var(--accent-color); }
+    .file-item.drag-over { background: rgba(123, 89, 222, 0.3); border: 1px dashed var(--accent-color); }
+    
+    /* 搜索高亮样式 */
+    .search-highlight {
+      background: rgba(123, 89, 222, 0.4);
+      color: #fff;
+      padding: 0 2px;
+      border-radius: 2px;
+      font-weight: 500;
+    }
+    
+    .search-match-count {
+      font-size: 10px;
+      background: var(--accent-color);
+      color: #fff;
+      padding: 2px 6px;
+      border-radius: 10px;
+      margin-left: auto;
+      min-width: 18px;
+      text-align: center;
+    }
+
+    /* 右侧区域 */
+    #main-area { flex: 1; display: flex; flex-direction: column; position: relative; background: var(--bg-editor); }
+    
+    /* Vditor 容器 */
+    #vditor { flex: 1; width: 100% !important; border: none !important; z-index: 1; }
+    
+    /* Vditor 样式覆盖 */
+    .vditor { --textarea-background-color: var(--bg-editor); background: var(--bg-editor) !important; border: none !important; }
+    .vditor-toolbar { background: var(--bg-editor) !important; border-bottom: 1px solid var(--border-color) !important; padding-left: 10px !important; }
+    .vditor-content { background: var(--bg-editor) !important; }
+    .vditor-reset { padding: 30px 50px !important; color: var(--text-main) !important; font-family: "JetBrains Mono", sans-serif !important; max-width: 900px; margin: 0 auto; }
+    
+    /* 编辑器中的搜索高亮 */
+    .vditor-content .search-highlight-editor,
+    .vditor-reset .search-highlight-editor {
+      background: rgba(123, 89, 222, 0.4) !important;
+      color: #fff !important;
+      padding: 2px 4px !important;
+      border-radius: 3px !important;
+      font-weight: 500 !important;
+    }
+
+    /* 空状态 */
+    #empty-state { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #444; background: var(--bg-editor); z-index: 10; }
+
+    /* 通用弹窗覆盖层 */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 2000; display: none; justify-content: center; padding-top: 100px; }
+    .modal-box { background: #252526; width: 320px; padding: 20px; border-radius: 8px; border: 1px solid #444; box-shadow: 0 10px 30px rgba(0,0,0,0.5); display: flex; flex-direction: column; height: fit-content;}
+    
+    .modal-title { font-weight: bold; font-size: 14px; margin-bottom: 15px; color: #fff; }
+    .modal-desc { font-size: 13px; color: #aaa; margin-bottom: 20px; line-height: 1.5; }
+    .modal-input { width: 100%; background: #111; border: 1px solid #444; color: #fff; padding: 10px; margin-bottom: 20px; box-sizing: border-box; border-radius: 4px;}
+    .modal-input:focus { border-color: var(--accent-color); outline: none; }
+
+    .modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
+    .btn { padding: 6px 16px; border-radius: 4px; cursor: pointer; font-size: 12px; border: 1px solid transparent; transition: 0.2s; }
+    .btn-cancel { background: transparent; color: #ccc; border-color: #444; }
+    .btn-cancel:hover { background: #333; }
+    .btn-primary { background: var(--accent-color); color: #fff; }
+    .btn-primary:hover { opacity: 0.9; }
+    .btn-danger { background: var(--danger-color); color: #fff; }
+    .btn-danger:hover { opacity: 0.9; }
+
+    /* 右键菜单 */
+    #context-menu {
+      position: fixed; background: #252526; border: 1px solid #454545; box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      z-index: 3000; display: none; flex-direction: column; min-width: 140px; border-radius: 4px; padding: 4px 0;
+    }
+    .ctx-item { padding: 8px 12px; cursor: pointer; font-size: 12px; color: #ccc; display: flex; align-items: center; }
+    .ctx-item:hover { background: #094771; color: #fff; }
+    .ctx-divider { height: 1px; background: #454545; margin: 4px 0; }
+    .ctx-icon { width: 16px; margin-right: 8px; text-align: center; }
+  </style>
+</head>
+<body>
+
+  <div id="sidebar">
+    <div class="search-wrapper">
+      <div class="search-container">
+        <i class="fas fa-search" style="padding: 0 12px; color: #666; font-size: 12px;"></i>
+        <input id="search-input" placeholder="Search in files..." autocomplete="off">
+        <div class="search-actions">
+          <i class="fas fa-times search-btn" id="search-clear" title="Clear" style="display: none;"></i>
+        </div>
+      </div>
+      <div class="search-options" id="search-options">
+        <button class="search-option-btn" id="search-regex" title="Use Regular Expression (Alt+R)">.*</button>
+        <button class="search-option-btn" id="search-case" title="Match Case (Alt+C)">Aa</button>
+        <button class="search-option-btn" id="search-word" title="Match Whole Word (Alt+W)">Ab</button>
+      </div>
+    </div>
+    <div class="sidebar-header" oncontextmenu="showRootCtx(event)">
+      <span class="header-title" id="list-title">EXPLORER</span>
+      <div style="display: flex; gap: 8px;">
+        <i class="fas fa-file-medical" style="cursor:pointer;color:#787878;font-size:13px" onclick="openCreateModal('file')" title="New File" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#787878'"></i>
+        <i class="fas fa-folder-plus" style="cursor:pointer;color:#787878;font-size:13px" onclick="openCreateModal('folder')" title="New Folder" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#787878'"></i>
+      </div>
+    </div>
+    <div id="file-list"></div>
+    <div id="resizer"></div>
+  </div>
+
+  <div id="main-area">
+    <div id="vditor"></div>
+    <div id="empty-state">
+      <i class="fab fa-markdown" style="font-size: 64px; margin-bottom: 20px; opacity: 0.2;"></i>
+      <span>Select a file</span>
+    </div>
+  </div>
+
+  <div id="modal-create" class="modal-overlay">
+    <div class="modal-box">
+      <div id="modal-create-title" class="modal-title">Create New</div>
+      <input id="modal-input" class="modal-input" autocomplete="off">
+      <div class="modal-actions">
+        <button class="btn btn-cancel" onclick="closeModals()">Cancel</button>
+        <button class="btn btn-primary" id="modal-confirm-btn" onclick="confirmCreate()">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-delete" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-title" style="color: var(--danger-color)">Delete Item</div>
+      <div class="modal-desc" id="delete-msg">Are you sure you want to delete this?</div>
+      <div class="modal-actions">
+        <button class="btn btn-cancel" onclick="closeModals()">Cancel</button>
+        <button class="btn btn-danger" onclick="confirmDelete()">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="context-menu">
+    <div class="ctx-item" id="ctx-new-file"><i class="fas fa-file-medical ctx-icon"></i>New File</div>
+    <div class="ctx-item" id="ctx-new-folder"><i class="fas fa-folder-plus ctx-icon"></i>New Folder</div>
+    <div class="ctx-divider"></div>
+    <div class="ctx-item" id="ctx-rename"><i class="fas fa-edit ctx-icon"></i>Rename</div>
+    <div class="ctx-divider"></div>
+    <div class="ctx-item" id="ctx-delete" style="color:#e06c75"><i class="fas fa-trash-alt ctx-icon"></i>Delete</div>
+  </div>
+
+  <script>
+    // --- State ---
+    let state = {
+      rootPath: null,
+      currentPath: null,
+      currentFilePath: null,
+      isSearch: false,
+      ctxTarget: null, // 右键选中的目标路径
+      searchOptions: {
+        useRegex: false,
+        matchCase: false,
+        wholeWord: false
+      },
+      currentSearchKeyword: ''
+    };
+    let vditor = null;
+    let createType = 'file';
+    let isRenameMode = false; // 区分是创建还是重命名
+
+    // --- 1. Vditor 初始化 (修复无反应问题) ---
+    const initVditor = () => {
+      // 检测 Vditor 是否加载成功
+      if (typeof Vditor === 'undefined') {
+        alert("错误：未找到 Vditor 资源。\n请确保 assets 文件夹已正确放入插件目录。");
+        return;
+      }
+
+      vditor = new Vditor('vditor', {
+        cdn: './assets/vditor', // 确保这个路径下有 dist 文件夹
+        height: '100%', width: '100%',
+        mode: 'ir', theme: 'dark',
+        cache: { enable: false }, outline: { enable: false }, resize: { enable: false },
+        toolbar: ['emoji', 'headings', 'bold', 'italic', '|', 'list', 'ordered-list', 'check', '|', 'code', 'inline-code', 'upload', 'link', 'table', '|', 'undo', 'redo'],
+        preview: {
+          math: { engine: 'KaTeX' }, markdown: { toc: true },
+          theme: { current: 'dark', path: './assets/vditor/dist/css/content-theme' },
+          hljs: { style: 'dracula' }
+        },
+        input: (val) => {
+          if (state.currentFilePath) window.services.saveFile(state.currentFilePath, val);
+        },
+        after: () => {
+          // 初始化完成
+          console.log('Vditor ready');
+          
+          // 监听键盘输入，处理自动列表
+          const editorElement = document.querySelector('.vditor-content');
+          if (editorElement) {
+            // 获取 CodeMirror 实例（Vditor IR 模式使用 CodeMirror）
+            const cmEditor = vditor.vditor?.ir?.editor?.cm;
+            if (cmEditor) {
+              // 监听输入事件
+              cmEditor.on('beforeChange', (cm, change) => {
+                // 如果输入的是空格，检查前面是否有列表标记
+                if (change.text && change.text.length > 0 && change.text[0] === ' ') {
+                  const line = cm.getLine(change.from.line);
+                  const beforeCursor = line.substring(0, change.from.ch);
+                  
+                  // 检查是否在行首输入了 '- ' 或数字加 '. '
+                  const listPattern = /^(\s*)([-*+]|\d+\.)\s*$/;
+                  if (listPattern.test(beforeCursor)) {
+                    // 延迟处理，让 Vditor 先处理
+                    setTimeout(() => {
+                      // Vditor 应该会自动处理，但我们可以确保它被触发
+                      const currentLine = cm.getLine(change.from.line);
+                      if (!currentLine.match(/^(\s*)([-*+]|\d+\.)\s+/)) {
+                        // 如果 Vditor 没有自动处理，手动触发
+                        vditor.vditor.ir.process();
+                      }
+                    }, 10);
+                  }
+                }
+              });
+            }
+          }
+        }
+      });
+    };
+
+    // --- 2. 打开文件 (修复无反应问题) ---
+    const openFile = (path) => {
+      state.currentFilePath = path;
+      const content = window.services.readFile(path);
+      
+      // 1. 界面切换
+      document.getElementById('empty-state').style.display = 'none';
+      
+      // 2. 赋值 (不做过多的状态检查，直接赋值，Vditor 会处理)
+      if (vditor) {
+        vditor.setValue(content);
+        // 强制聚焦一下，有时能唤醒渲染
+        setTimeout(() => {
+          vditor.focus();
+          // 如果正在搜索，高亮搜索关键字
+          if (state.isSearch && state.currentSearchKeyword) {
+            const regex = buildSearchRegex(state.currentSearchKeyword, state.searchOptions);
+            if (regex) {
+              // 等待 Vditor 渲染完成后再高亮
+              setTimeout(() => {
+                highlightInEditor(regex);
+              }, 300);
+            }
+          }
+        }, 100);
+      } else {
+        // 如果点太快，初始化还没完，尝试重试一次
+        console.warn("Vditor instance missing, retrying...");
+        setTimeout(() => { 
+          if(vditor) {
+            vditor.setValue(content);
+            if (state.isSearch && state.currentSearchKeyword) {
+              const regex = buildSearchRegex(state.currentSearchKeyword, state.searchOptions);
+              if (regex) {
+                setTimeout(() => {
+                  highlightInEditor(regex);
+                }, 300);
+              }
+            }
+          }
+        }, 500);
+      }
+      
+      if (!state.isSearch) refreshList();
+    };
+
+    // --- 3. 列表刷新与导航 ---
+    const refreshList = () => {
+      if (state.isSearch) return;
+      const listEl = document.getElementById('file-list');
+      listEl.innerHTML = '';
+      
+      // 返回上一级
+      if (state.currentPath !== state.rootPath) {
+        const backDiv = document.createElement('div');
+        backDiv.className = 'file-item';
+        backDiv.innerHTML = `<i class="fas fa-level-up-alt" style="width:20px;text-align:center;margin-right:6px"></i> ..`;
+        backDiv.onclick = () => {
+          const parent = window.services.getParentDir(state.currentPath);
+          state.currentPath = (parent.length < state.rootPath.length) ? state.rootPath : parent;
+          refreshList();
+        };
+        // 支持拖拽返回
+        setupDropZone(backDiv, () => {
+             const parent = window.services.getParentDir(state.currentPath);
+             return parent.length >= state.rootPath.length ? parent : state.rootPath;
+        });
+        listEl.appendChild(backDiv);
+      }
+
+      const items = window.services.listFilesAndFolders(state.currentPath);
+      items.forEach(item => {
+        const div = document.createElement('div');
+        div.className = `file-item ${item.path === state.currentFilePath ? 'active' : ''}`;
+        div.title = item.path;
+        
+        // 搜索高亮
+        let nameHtml = item.name;
+        if (state.isSearch) {
+           const key = document.getElementById('search-input').value;
+           nameHtml = item.name.replace(new RegExp(key, 'gi'), m => `<span style="color:#fff;background:rgba(123,89,222,0.5)">${m}</span>`);
+        }
+
+        const icon = item.isDirectory ? '<i class="fas fa-folder" style="color:#dcb67a"></i>' : '<i class="fab fa-markdown" style="color:#7b59de"></i>';
+        div.innerHTML = `<span style="width:20px;text-align:center;margin-right:6px">${icon}</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis">${nameHtml}</span>`;
+
+        // 点击
+        div.onclick = () => {
+          if (item.isDirectory) {
+            state.currentPath = item.path;
+            if(state.isSearch) { state.isSearch=false; document.getElementById('search-input').value=''; document.getElementById('list-title').innerText="EXPLORER"; }
+            refreshList();
+          } else {
+            openFile(item.path);
+          }
+        };
+
+        // 右键 & 拖拽
+        div.oncontextmenu = (e) => showCtxMenu(e, item);
+        div.draggable = true;
+        div.ondragstart = (e) => { e.dataTransfer.setData("text/plain", item.path); };
+        if (item.isDirectory) setupDropZone(div, () => item.path);
+
+        listEl.appendChild(div);
+      });
+    };
+
+    const setupDropZone = (el, getDest) => {
+      el.ondragover = (e) => { e.preventDefault(); el.classList.add('drag-over'); };
+      el.ondragleave = () => el.classList.remove('drag-over');
+      el.ondrop = (e) => {
+        e.preventDefault(); el.classList.remove('drag-over');
+        const src = e.dataTransfer.getData("text/plain");
+        const dest = getDest();
+        if(src && dest && window.services.moveItem(src, dest)) refreshList();
+      };
+    };
+
+    // --- 4. 弹窗逻辑 (修复白框崩溃) ---
+    const closeModals = () => {
+      document.getElementById('modal-create').style.display = 'none';
+      document.getElementById('modal-delete').style.display = 'none';
+    };
+
+    // 新建
+    const openCreateModal = (type) => {
+      isRenameMode = false;
+      createType = type;
+      document.getElementById('modal-create-title').innerText = type==='file' ? 'New File Name' : 'New Folder Name';
+      document.getElementById('modal-confirm-btn').innerText = 'Create';
+      const modal = document.getElementById('modal-create');
+      modal.style.display = 'flex';
+      const input = document.getElementById('modal-input');
+      input.value = ''; input.focus();
+    };
+
+    // 重命名
+    const openRenameModal = (item) => {
+      if(!item) return;
+      isRenameMode = true;
+      document.getElementById('modal-create-title').innerText = 'Rename';
+      document.getElementById('modal-confirm-btn').innerText = 'Rename';
+      const modal = document.getElementById('modal-create');
+      modal.style.display = 'flex';
+      const input = document.getElementById('modal-input');
+      // 如果是文件，去掉 .md 后缀显示，重命名时会自动加回去
+      const displayName = item.isDirectory ? item.name : item.name.replace(/\.md$/, '');
+      input.value = displayName;
+      input.select();
+      input.focus();
+    };
+    
+    const confirmCreate = () => {
+      const name = document.getElementById('modal-input').value.trim();
+      if(!name) return;
+
+      if(isRenameMode) {
+        // 重命名模式
+        if(!state.ctxTarget) return;
+        let newName = name;
+        // 如果是文件且没有 .md 后缀，自动添加
+        if(!state.ctxTarget.isDirectory && !newName.endsWith('.md')) {
+          newName += '.md';
+        }
+        const newPath = window.services.renameItem(state.ctxTarget.path, newName);
+        if(newPath) {
+          // 如果重命名的是当前打开的文件，更新路径
+          if(state.currentFilePath === state.ctxTarget.path) {
+            state.currentFilePath = newPath;
+            // 重新读取文件内容（路径变了）
+            const content = window.services.readFile(newPath);
+            if(vditor) vditor.setValue(content);
+          }
+          refreshList();
+        } else {
+          alert('重命名失败：名称已存在或无效');
+        }
+      } else {
+        // 创建模式
+        if(createType === 'file') {
+          const p = window.services.createFile(state.currentPath, name);
+          if(p) openFile(p);
+        } else {
+          window.services.createFolder(state.currentPath, name);
+        }
+        refreshList();
+      }
+      closeModals();
+    };
+    
+    // 回车确认新建/重命名
+    document.getElementById('modal-input').onkeydown = (e) => { if(e.key==='Enter') confirmCreate(); if(e.key==='Escape') closeModals(); };
+
+    // 删除
+    const confirmDelete = () => {
+      if(state.ctxTarget) {
+        window.services.deleteItem(state.ctxTarget.path);
+        if(state.ctxTarget.path === state.currentFilePath) {
+          document.getElementById('empty-state').style.display = 'flex';
+          state.currentFilePath = null;
+          vditor.setValue("");
+        }
+        refreshList();
+      }
+      closeModals();
+    };
+
+    // --- 5. 右键菜单 ---
+    const ctxMenu = document.getElementById('context-menu');
+    
+    const showCtxMenu = (e, item) => {
+      e.preventDefault(); e.stopPropagation();
+      state.ctxTarget = item;
+      // 文件和文件夹都显示重命名和删除
+      document.getElementById('ctx-rename').style.display = 'flex';
+      document.getElementById('ctx-delete').style.display = 'flex';
+      // 文件右键不显示新建
+      document.getElementById('ctx-new-file').style.display = 'none';
+      document.getElementById('ctx-new-folder').style.display = 'none';
+      
+      showMenuAt(e.clientX, e.clientY);
+    };
+
+    const showRootCtx = (e) => {
+      e.preventDefault();
+      state.ctxTarget = null; // 针对当前目录
+      document.getElementById('ctx-rename').style.display = 'none';
+      document.getElementById('ctx-delete').style.display = 'none';
+      document.getElementById('ctx-new-file').style.display = 'flex';
+      document.getElementById('ctx-new-folder').style.display = 'flex';
+      showMenuAt(e.clientX, e.clientY);
+    };
+
+    const showMenuAt = (x, y) => {
+      ctxMenu.style.left = x + 'px';
+      ctxMenu.style.top = y + 'px';
+      ctxMenu.style.display = 'flex';
+    };
+
+    document.onclick = () => ctxMenu.style.display = 'none';
+    
+    // 菜单绑定
+    document.getElementById('ctx-new-file').onclick = () => { ctxMenu.style.display = 'none'; openCreateModal('file'); };
+    document.getElementById('ctx-new-folder').onclick = () => { ctxMenu.style.display = 'none'; openCreateModal('folder'); };
+    document.getElementById('ctx-rename').onclick = () => { ctxMenu.style.display = 'none'; openRenameModal(state.ctxTarget); };
+    document.getElementById('ctx-delete').onclick = () => {
+      if(!state.ctxTarget) return;
+      ctxMenu.style.display = 'none';
+      document.getElementById('delete-msg').innerText = `Delete "${state.ctxTarget.name}"?`;
+      document.getElementById('modal-delete').style.display = 'flex';
+    };
+
+    // --- 6. 高级搜索功能 ---
+    
+    // 构建正则表达式
+    const buildSearchRegex = (keyword, options) => {
+      if (!keyword) return null;
+      
+      let pattern = keyword;
+      
+      // 如果不是正则模式，转义特殊字符
+      if (!options.useRegex) {
+        pattern = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      }
+      
+      // 整词匹配
+      if (options.wholeWord && !options.useRegex) {
+        pattern = `\\b${pattern}\\b`;
+      }
+      
+      try {
+        const flags = options.matchCase ? 'g' : 'gi';
+        return new RegExp(pattern, flags);
+      } catch (e) {
+        // 正则表达式错误，返回null
+        return null;
+      }
+    };
+    
+    // 高亮文本
+    const highlightText = (text, regex) => {
+      if (!regex || !text) return text;
+      
+      try {
+        const matches = text.match(regex);
+        if (!matches || matches.length === 0) return text;
+        
+        // 使用replaceAll来高亮所有匹配
+        return text.replace(regex, (match) => {
+          return `<span class="search-highlight">${match}</span>`;
+        });
+      } catch (e) {
+        return text;
+      }
+    };
+    
+    // 计算匹配数量
+    const countMatches = (text, regex) => {
+      if (!regex || !text) return 0;
+      try {
+        const matches = text.match(regex);
+        return matches ? matches.length : 0;
+      } catch (e) {
+        return 0;
+      }
+    };
+    
+    // 切换搜索选项
+    const toggleSearchOption = (option) => {
+      state.searchOptions[option] = !state.searchOptions[option];
+      const btn = document.getElementById(`search-${option === 'useRegex' ? 'regex' : option === 'matchCase' ? 'case' : 'word'}`);
+      btn.classList.toggle('active', state.searchOptions[option]);
+      performSearch();
+    };
+    
+    // 搜索选项切换
+    document.getElementById('search-regex').addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleSearchOption('useRegex');
+    });
+    
+    document.getElementById('search-case').addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleSearchOption('matchCase');
+    });
+    
+    document.getElementById('search-word').addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleSearchOption('wholeWord');
+    });
+    
+    // 键盘快捷键支持
+    document.getElementById('search-input').addEventListener('keydown', (e) => {
+      // Alt+R: 切换正则
+      if (e.altKey && e.key === 'r') {
+        e.preventDefault();
+        toggleSearchOption('useRegex');
+      }
+      // Alt+C: 切换大小写
+      if (e.altKey && e.key === 'c') {
+        e.preventDefault();
+        toggleSearchOption('matchCase');
+      }
+      // Alt+W: 切换整词
+      if (e.altKey && e.key === 'w') {
+        e.preventDefault();
+        toggleSearchOption('wholeWord');
+      }
+    });
+    
+    // 清空搜索
+    document.getElementById('search-clear').addEventListener('click', () => {
+      document.getElementById('search-input').value = '';
+      document.getElementById('search-clear').style.display = 'none';
+      state.isSearch = false;
+      state.currentSearchKeyword = '';
+      document.getElementById('list-title').innerText = "EXPLORER";
+      refreshList();
+    });
+    
+    // 执行搜索
+    const performSearch = () => {
+      const val = document.getElementById('search-input').value.trim();
+      state.currentSearchKeyword = val;
+      
+      if (val) {
+        state.isSearch = true;
+        document.getElementById('list-title').innerText = "SEARCH";
+        document.getElementById('search-clear').style.display = 'flex';
+        
+        // 使用新的搜索函数，传递搜索选项
+        const res = window.services.searchFilesAdvanced(
+          state.rootPath, 
+          val, 
+          state.searchOptions
+        );
+        
+        const listEl = document.getElementById('file-list');
+        listEl.innerHTML = '';
+        
+        if (res.length === 0) {
+          listEl.innerHTML = '<div style="padding:10px;color:#666;text-align:center">No results</div>';
+        } else {
+          const regex = buildSearchRegex(val, state.searchOptions);
+          
+          res.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'file-item';
+            
+            // 高亮文件名
+            const nameHtml = highlightText(item.name, regex);
+            
+            // 计算匹配数量
+            const matchCount = item.matchCount || 0;
+            const countBadge = matchCount > 0 ? `<span class="search-match-count">${matchCount}</span>` : '';
+            
+            const icon = item.isDirectory ? 
+              '<i class="fas fa-folder" style="color:#dcb67a"></i>' : 
+              '<i class="fab fa-markdown" style="color:#7b59de"></i>';
+            
+            div.innerHTML = `
+              <span style="width:20px;text-align:center;margin-right:6px">${icon}</span>
+              <span style="flex:1;overflow:hidden;text-overflow:ellipsis">${nameHtml}</span>
+              ${countBadge}
+            `;
+            
+            div.onclick = () => {
+              openFile(item.path);
+              // 如果文件已打开，高亮搜索关键字
+              if (vditor && regex) {
+                highlightInEditor(regex);
+              }
+            };
+            
+            listEl.appendChild(div);
+          });
+        }
+      } else {
+        state.isSearch = false;
+        document.getElementById('list-title').innerText = "EXPLORER";
+        document.getElementById('search-clear').style.display = 'none';
+        refreshList();
+      }
+    };
+    
+    // 在编辑器中高亮搜索关键字
+    const highlightInEditor = (regex) => {
+      if (!vditor || !regex) return;
+      
+      // Vditor 的 IR 模式下，我们通过修改渲染后的内容来高亮
+      setTimeout(() => {
+        const editorElement = document.querySelector('.vditor-content');
+        const resetElement = document.querySelector('.vditor-reset');
+        const targetElement = resetElement || editorElement;
+        
+        if (targetElement) {
+          // 移除之前的高亮
+          targetElement.querySelectorAll('.search-highlight-editor').forEach(el => {
+            const parent = el.parentNode;
+            if (parent) {
+              parent.replaceChild(document.createTextNode(el.textContent), el);
+              parent.normalize();
+            }
+          });
+          
+          // 添加新的高亮（遍历文本节点）
+          const walker = document.createTreeWalker(
+            targetElement,
+            NodeFilter.SHOW_TEXT,
+            {
+              acceptNode: (node) => {
+                // 跳过代码块和已经高亮的节点
+                let parent = node.parentNode;
+                while (parent && parent !== targetElement) {
+                  if (parent.tagName === 'CODE' || parent.tagName === 'PRE' || 
+                      parent.classList.contains('search-highlight-editor')) {
+                    return NodeFilter.FILTER_REJECT;
+                  }
+                  parent = parent.parentNode;
+                }
+                return NodeFilter.FILTER_ACCEPT;
+              }
+            },
+            false
+          );
+          
+          const textNodes = [];
+          let node;
+          while (node = walker.nextNode()) {
+            if (node.textContent.trim()) {
+              textNodes.push(node);
+            }
+          }
+          
+          textNodes.forEach(textNode => {
+            const text = textNode.textContent;
+            try {
+              const matches = text.match(regex);
+              if (matches && matches.length > 0) {
+                const parent = textNode.parentNode;
+                if (parent) {
+                  const highlighted = text.replace(regex, (match) => {
+                    return `<span class="search-highlight-editor">${match}</span>`;
+                  });
+                  
+                  const temp = document.createElement('div');
+                  temp.innerHTML = highlighted;
+                  const fragment = document.createDocumentFragment();
+                  while (temp.firstChild) {
+                    fragment.appendChild(temp.firstChild);
+                  }
+                  parent.replaceChild(fragment, textNode);
+                }
+              }
+            } catch (e) {
+              // 忽略错误
+            }
+          });
+        }
+      }, 200);
+    };
+    
+    // 搜索输入监听
+    document.getElementById('search-input').addEventListener('input', performSearch);
+    document.getElementById('search-input').addEventListener('focus', () => {
+      if (document.getElementById('search-input').value) {
+        document.getElementById('search-clear').style.display = 'flex';
+      }
+    });
+
+    const init = () => {
+      const root = window.services.getRootFolder();
+      if(!root) {
+        const p = window.services.selectDirectory();
+        if(p) { window.services.saveRootFolder(p); init(); }
+      } else {
+        state.rootPath = root;
+        state.currentPath = root;
+        refreshList();
+        initVditor();
+      }
+    };
+
+    // 拖拽宽度
+    const resizer = document.getElementById('resizer');
+    const sidebar = document.getElementById('sidebar');
+    let isResizing = false;
+    resizer.onmousedown = () => { isResizing=true; document.body.style.cursor='col-resize'; };
+    document.onmouseup = () => { isResizing=false; document.body.style.cursor='default'; };
+    document.onmousemove = (e) => { if(isResizing) sidebar.style.width = Math.max(150, Math.min(e.clientX, 500))+'px'; };
+
+    utools.onPluginEnter(init);
+  </script>
+</body>
+</html>

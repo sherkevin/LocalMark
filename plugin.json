@@ -1,0 +1,15 @@
+{
+  "pluginName": "MyLocalMark",
+  "version": "1.0.0",
+  "description": "存储在本地的 Markdown 便签",
+  "logo": "logo.png",  
+  "main": "index.html",
+  "preload": "preload.js",
+  "features": [
+    {
+      "code": "mymd",
+      "explain": "我的本地笔记",
+      "cmds": ["Markdown", "md", "笔记"]
+    }
+  ]
+}
