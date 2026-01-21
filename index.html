@@ -342,38 +342,119 @@
           // 初始化完成
           console.log('Vditor ready');
           
-          // 监听键盘输入，处理自动列表
-          const editorElement = document.querySelector('.vditor-content');
-          if (editorElement) {
-            // 获取 CodeMirror 实例（Vditor IR 模式使用 CodeMirror）
-            const cmEditor = vditor.vditor?.ir?.editor?.cm;
-            if (cmEditor) {
-              // 监听输入事件
-              cmEditor.on('beforeChange', (cm, change) => {
-                // 如果输入的是空格，检查前面是否有列表标记
-                if (change.text && change.text.length > 0 && change.text[0] === ' ') {
-                  const line = cm.getLine(change.from.line);
-                  const beforeCursor = line.substring(0, change.from.ch);
-                  
-                  // 检查是否在行首输入了 '- ' 或数字加 '. '
-                  const listPattern = /^(\s*)([-*+]|\d+\.)\s*$/;
-                  if (listPattern.test(beforeCursor)) {
-                    // 延迟处理，让 Vditor 先处理
-                    setTimeout(() => {
-                      // Vditor 应该会自动处理，但我们可以确保它被触发
-                      const currentLine = cm.getLine(change.from.line);
-                      if (!currentLine.match(/^(\s*)([-*+]|\d+\.)\s+/)) {
-                        // 如果 Vditor 没有自动处理，手动触发
-                        vditor.vditor.ir.process();
-                      }
-                    }, 10);
-                  }
-                }
-              });
-            }
-          }
+          // 监听输入，处理自动列表格式化
+          setupAutoList();
         }
       });
+    };
+    
+    // 设置自动列表功能
+    const setupAutoList = () => {
+      if (!vditor || !vditor.vditor) return;
+
+      // 等待编辑器完全初始化
+      setTimeout(() => {
+        const irEditor = vditor.vditor.ir;
+        if (!irEditor || !irEditor.element) return;
+
+        // 找到编辑器的可编辑区域
+        const editableElement = irEditor.element.querySelector('[contenteditable="true"]');
+        if (!editableElement) {
+          console.log('未找到可编辑元素');
+          return;
+        }
+
+        console.log('设置自动列表监听器');
+
+        // 监听 keyup 事件
+        editableElement.addEventListener('keyup', (event) => {
+          // 只处理空格键
+          if (event.key !== ' ' || event.shiftKey || event.ctrlKey || event.altKey || event.metaKey) {
+            return;
+          }
+
+          console.log('检测到空格键');
+
+          // 获取选区
+          const selection = window.getSelection();
+          if (!selection.rangeCount) return;
+
+          const range = selection.getRangeAt(0);
+          let container = range.startContainer;
+
+          // 找到文本节点
+          if (container.nodeType !== Node.TEXT_NODE) {
+            container = container.childNodes[range.startOffset] || container;
+          }
+
+          // 向上找到块级元素
+          let block = container;
+          while (block && block !== editableElement) {
+            if (block.nodeType === Node.ELEMENT_NODE &&
+                (block.tagName === 'P' || block.tagName === 'DIV' ||
+                 block.classList.contains('vditor-ir__node'))) {
+              break;
+            }
+            block = block.parentNode;
+          }
+
+          if (!block) return;
+
+          // 获取当前行的文本
+          const text = block.textContent || '';
+          console.log('当前行文本:', text);
+
+          // 检查是否是列表标记
+          // 无序列表: -, *, + 后跟空格
+          const unorderedMatch = text.match(/^(\s*)([-*+])\s$/);
+          // 有序列表: 1., 2., 等后跟空格
+          const orderedMatch = text.match(/^(\s*)(\d+)\.\s$/);
+
+          if (unorderedMatch || orderedMatch) {
+            console.log('匹配到列表标记');
+
+            event.preventDefault();
+            event.stopPropagation();
+
+            const indent = (unorderedMatch || orderedMatch)[1];
+            const marker = unorderedMatch ? unorderedMatch[2] : orderedMatch[2];
+            const isOrdered = !!orderedMatch;
+
+            // 使用 Vditor 的 API 来插入列表
+            // 获取当前值并找到当前行
+            const currentValue = vditor.getValue();
+            const lines = currentValue.split('\n');
+
+            // 假设光标在最后一行（简化处理）
+            const lastLineIndex = lines.length - 1;
+
+            // 替换当前行为正确的列表格式
+            if (isOrdered) {
+              lines[lastLineIndex] = `${indent}${marker}. `;
+            } else {
+              lines[lastLineIndex] = `${indent}${marker} `;
+            }
+
+            // 更新编辑器内容
+            const newValue = lines.join('\n');
+            vditor.setValue(newValue);
+
+            // 设置光标到行尾
+            setTimeout(() => {
+              const editor = vditor.vditor.ir.editor;
+              if (editor && editor.focus) {
+                editor.focus();
+                // 尝试将光标移动到行尾
+                const lineLength = lines[lastLineIndex].length;
+                if (editor.setCursor) {
+                  // 这个可能不工作，因为 Vditor 可能不暴露这个 API
+                  // editor.setCursor({ line: lastLineIndex, ch: lineLength });
+                }
+              }
+            }, 10);
+          }
+        });
+      }, 500);
     };
 
     // --- 2. 打开文件 (修复无反应问题) ---
